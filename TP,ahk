@@ -1,0 +1,121 @@
+#SingleInstance, Force
+#NoTrayIcon
+
+Gui,Add,Text,x10 y10 w320 r1 +Center,Inserir os IDs dos TPs separados por vírgula como no exemplo abaixo.
+Gui,Add,Edit,x10 y30 w320 h60 vArray1,9171,10069,9182,5179
+Gui,Add,Text,x10 y100 w150 r1 +Center,Username
+Gui,Add,Text,x+20 y100 w150 r1 +Center,Password
+Gui,Add,Edit,x10 y115 w150 r1 +Center vusername,
+Gui,Add,Edit,x+20 y115 w150 r1 +Center Password vpasscode,
+Gui,Add,Button,x10 y+20 w150 h30 gSTART vSTART,Login
+Gui,Add,Button,x+20 y156 w150 h30 gGuiClose vGuiClose,Sair
+Gui,Add,Checkbox,x20 y195 w320 vvisible +BackgroundTrans, Deseja ver o IE trabalhando ?
+GuiControl,,Visible,1
+
+
+
+Gui,Show,,Verificador de TPs
+return
+
+
+GuiClose:
+{
+	DetectHiddenWindows,On
+	Loop
+	{
+
+		Sleep,1
+
+		ifwinexist, ahk_class IEFrame
+			{
+				winclose,ahk_class IEFrame
+			}
+		else
+		{
+		break
+		}
+	}
+
+ExitApp
+}
+START:
+{ 
+	Gui,Submit,Nohide
+	GuiControl,Disable,Sair
+	GuiControl,Disable,Start
+	stringreplace,array1,array1,`,,`,,UseErrorLevel
+	N:=ErrorLevel+1
+	
+	
+	ie := ComObjCreate("InternetExplorer.Application")
+	
+	ie.Visible := Visible
+
+	URL := "http://lms.infnet.edu.br/moodle/my/"
+	
+	ie.Navigate(URL)
+	
+	While ie.busy
+			{
+				Sleep 10
+			}
+		Sleep, 2000
+		ie.document.all.username.value := username
+		ie.document.all.password.value := passcode
+		ie.document.all.loginbtn.click()
+		While ie.busy
+			{
+				Sleep 50
+			}
+		@ := ie.document.URL
+		if @ = http://lms.infnet.edu.br/moodle/login/index.php
+		{
+		msgbox, Falha na tentativa de logar.
+		guiControl,Enable,Start
+		guiControl,Enable,Sair
+		ie.Quit
+		return
+		}
+		
+		Logoutlink := ie.document.All[0].outerHTML
+		R = "sesskey":"(.*?)"
+		RegExMatch(Logoutlink,R,@)
+		Logout = http://lms.infnet.edu.br/moodle/login/logout.php?sesskey=%@1%
+
+	
+		LIST = 
+		Loop,Parse,Array1,`,
+		{
+			URL = http://lms.infnet.edu.br/moodle/mod/assign/view.php?id=%A_LoopField%
+			guicontrol,Text,Start,%A_index% de %N%
+			
+			ie.Navigate(URL)
+			While ie.busy
+			{
+				Sleep 50
+			}
+			htmlcode := ie.document.body.outerHTML
+			;FileRead,HTMLCODE,%A_ScriptDIr%\HTML.txt
+			R = Precisa de avaliação[\s\S]*?cell c1 lastcol`">(.*?)<\/td>
+			RegExMatch(HTMLCODE,R,@)
+			LIST .= "`n" A_LoopField A_Space "-->" A_Space @1
+			
+		}
+		LIST = ID da página --> Quantidade de TPs`n----------------------------------%LIST%
+		FileDelete,%A_ScriptDir%\OUTPUT.txt
+		FileAppend,%LIST%,%A_ScriptDir%\OUTPUT.txt
+		GuiControl,Text,Start,Login
+		ie.Navigate(Logout)
+
+		While ie.busy
+			{
+				Sleep 50
+			}
+		ie.Quit
+
+		GuiControl,Enable,Start
+		GuiControl,Enable,Sair
+		msgbox, Pronto, verifiquei %N% TPs... :)
+		ExitApp
+	Return
+}
